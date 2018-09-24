@@ -1,0 +1,208 @@
+---
+title: "BIOS611 : Project 1"
+author: "Richard Sizelove"
+date: "September 24, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(usmap)
+library(tidyverse)
+library(reshape2)
+library(plotly)
+library(RColorBrewer)
+```
+
+## USArrest Datatset
+
+#### R-Code
+
+```{r, message = FALSE}
+state_names <- row.names(USArrests)
+state.x77 <- as.data.frame(state.x77)
+income <- state.x77['Income']
+
+
+USArrests <- cbind(USArrests, state_names, income, state.abb)
+colnames(USArrests)[5] <- 'state'
+colnames(USArrests)[6] <- 'Income'
+
+USArrests <- USArrests %>% group_by(state) %>% mutate(ViolentCrime = sum(Assault, Murder, Rape))
+
+# give state boundaries a white border
+l <- list(color = toRGB("white"), width = 2)
+# specify some map projection/options
+g <- list(
+  scope = 'usa',
+  projection = list(type = 'albers usa'),
+  showlakes = TRUE,
+  lakecolor = toRGB('white')
+)
+```
+
+#### Figures
+
+```{r}
+USArrests$hover <- with(USArrests, paste(state, '<br>', "Income:", 
+                                         Income, '<br>', "Total Violent Crime:", ViolentCrime, '<br>', "Rape:", Rape, '<br>', "Murder:", Murder, '<br>', 
+                                         "Assault:", Assault, '<br>'))
+
+IncomeChart <- plot_geo(USArrests, locationmode = 'USA-states') %>%
+  add_trace(
+    z = USArrests$Income, text = USArrests$hover, locations = USArrests$state.abb,
+    color = USArrests$Income, colors = 'Blues'
+  ) %>%
+  colorbar(title = "Income") %>%
+  layout(
+    title = '1974 US Income Levels<br>(Hover for breakdown)',
+    geo = g
+  )
+
+
+CrimeChart <- plot_geo(USArrests, locationmode = 'USA-states') %>%
+  add_trace(
+    z = USArrests$ViolentCrime, text = USArrests$hover, locations = USArrests$state.abb,
+    color = USArrests$ViolentCrime, colors = 'Reds'
+  ) %>%
+  colorbar(title = "Incidents") %>%
+  layout(
+    title = '1976 Violent Crime (per 100,000)<br>(Hover for breakdown)',
+    geo = g
+  )
+
+IncomeChart
+CrimeChart
+```
+
+##### Summary
+> The two Choropleth US Maps above follow two core datasets from R, `USArrests` and `state.x77`. `USAssault` contains violent crime arrest data from the 50 US States. `state.x77` is a concatenation of several state datasets, ranging from the early 60's to the late 70's. The charts center around the relative per-capita income in 1974 and the violent crime rates in 1975. Sorting by income, it is clear that the lowest per-capita-income states are concentrated in the Southeast, with Mississippi, Louisiana, and Arkansas taking the three lowest positions. High income areas take hold of the east and west coasts, where California and Maryland take the highest values. Surprisingly, Alaska has the highest overall per-capita-income, just 15 years after joining the union. Focusing on crime, the regional distinctions present for income don't take shape. While California and Nevada have high violent crime rates, this is not a general trend of the west coast. The same can be said for Florida and North Carolina, high-crime outliers in the Southeast. Perhaps more surprisingly, income does not seem to have the assumed affect on crime rates. In California, Florida, and Alaska; regional juggernauts in terms of income; crime rates also rise above their tamer neighbors. Why is our common association of low-income with high-crime not holding? Further analysis is needed, but the data is too sparce to tell. Per-capita-income is simply an averaged value, so we may not  be seeing the true income distribution, with a few rich outliers pulling up an impoverished populace. Additionally, per-capita-income has no cost-of-living adjustment, and Mississipians may 'feel' wealthier than their west-coast counterparts, despite earning 40% less. Without more robust datasets available, these question go unanswered.
+
+## Titanic Dataset
+
+#### R-Code
+```{r}
+Titanic <- as.tibble(Titanic)
+Titanic['Total'] <- Titanic %>% summarize(sum(n))
+Titanic <- Titanic %>% group_by(Age) %>% mutate(By.Age = sum(n))
+Titanic <- Titanic %>% group_by(Age, Sex) %>% mutate(By.Age.Gender = sum(n))
+Titanic <- Titanic %>% group_by(Sex, Class) %>% mutate(By.Age.Class.Sex = sum(n))
+Titanic <- Titanic %>% group_by(Class, Survived) %>% mutate(By.Class = sum(n))
+Titanic <- Titanic %>% group_by(Sex, Survived) %>% mutate(By.Gender = sum(n))
+```
+
+
+#### Figure
+```{r}
+Titanic_Sankey <- plot_ly(
+  type = "sankey",
+  orientation = "h",
+  
+  node = list(
+    label = c("Total", "Adult", "Child", "Male", "Female", "1st Class", "2nd Class", "3rd Class", "Crew", "Perished", "Survived"),
+    color = c("#4E4D5C", "#689689", "#DCB8CB", "#78A1BB", "#4B2E39", "#C5FFFD", "#C4CAD0", "#7B6D8D","#88A2AA", "#2E2C2F", "#809BCE"),
+    pad = 15,
+    thickness = 20,
+    line = list(
+      color = "black",
+      width = .5
+    )
+  ),
+  
+  link = list(
+    source = c(0,0,1,1,2,2,3,3,3,3,4,4,4,4,5,5,6,6,7,7,8,8),
+    target = c(1,2,3,4,3,4,5,6,7,8,5,6,7,8,9,10,9,10,9,10,9,10),
+    value =  c(2092,109,1667,425,64,45,180,179,510,862,145,106,196,23,122,203,167,118,528,178,673,212)
+  )
+) %>% 
+  layout(
+    title = "Survival Status Primarily Determined by Class",
+    font = list(
+      size = 13
+    )
+  )
+
+Titanic_Sankey
+```
+
+#### Summary
+
+> This Sankey Diagram follows the the `Titanic` dataset in R, which is derived from a dataset from the Birtish Board of Trade (1990). The set includes frequencies for demographics, stratified on class, sex, age, and survival status. A common goal is to determine the variables which affected passenger survival during the 1909 maritime disaster. Focusing on class, we see that a large proportions of those from 3rd class and the ship's crew perished comapred to their upper-class counterparts. Around 38% of the first class was lost, dwarfed by the whopping 78% of crew who perished. This trend may also explain a gender-bias in the data; men accounted for 97.4% of the crew, but under 60% of the first class. This contrasts greatly with women, the majority (53.4%) of whom had upper-class tickets. A further question regarding this discussion; which came first? Did class determine life-or-death decisions, or gender? A common claim is that a 'women-and-children-first' policy created gender-centric disparities. If this is the case, why did 27% of women still die upon the Titanic? In fact, the number of men from first-class who survived the historic downing parrallels the number of women total who perished. This question requires further investigation, and more detailed data.
+
+## EuStockMarkets Dataset
+
+#### R-Code
+
+```{r, message=FALSE, warning = FALSE}
+EuStockMarkets <- EuStockMarkets
+
+StockMarket <- as.data.frame(EuStockMarkets)
+
+StockMarket <- StockMarket %>% mutate(time = time(EuStockMarkets)) %>%
+              gather(key = market, value = value, DAX:FTSE)
+
+StockMarket <- StockMarket %>% group_by(time) %>% mutate(ave_value = (sum(value)/4))
+
+StockMarketSubset <- StockMarket[c(1,2,4)]
+StockMarketSubset$market = "AVE"
+StockMarketSubset <- unique(StockMarketSubset)
+colnames(StockMarketSubset)[3] <- 'value'
+StockMarket <- rbind(StockMarket[c(1,2,3)], StockMarketSubset)
+```
+
+#### Figure
+
+```{r, message=FALSE}
+ggplot(StockMarket, aes(x = time, y = value, group = market, colour = market)) +
+  geom_line()  +
+    labs(title = "European Markets (1991 - 1999)") + 
+    scale_color_manual(name = 'Market',labels = c("Average Market Value", "France (CAC)", "Germany (DAX)",
+                                                  "UK (FTSE)", "Switzerland (SMI)"), values = c('black', brewer.pal(4, 'Set2'))) +
+    xlab("Time") + 
+    ylab("Valuation (USD)") +
+    geom_vline(xintercept = 1997.810, color = 'red') +
+    annotate('text', label="1997 'Mini-Crash'", x=1997.100, y=1800, color='black', size = 2.5) +
+    geom_vline(xintercept = 1998.550, color='red') +
+    annotate('text', label = "1998 Russian\nFinancial Crisis", x = 1998.400, y = 1800, color='black', size = 2.5)
+```
+
+#### Summary
+
+> This line chart follows the EuStockMarkets dataset, provided by the Erste Bank AG, Vienna, Austria. The dataset follows the daily closing prices of four major European stock indices from the middle of 1991 to the end of 1998. During this time, the average index price rose 334%, from an average value of 1880.812 in mid-1991, to a maximum value of 6283.698 by mid-1998. It documents the rise of Switzerland as an emerging economic powerhouse in Europe, overtaking France in mid-1992, and later overthrowing UK as the most valuable market in early 1997. Similarly it catalogs the success of a newly reunified Germany, with the Rhineland's markets outcompeting France by 1995, and beating the market average in late 1998. Two significant events are also outlined. The 1997 'Mini-Crash' generated by crashing markets in Asia sent similar ripples to Europe, with the market average falling to its lowest point in nearly a year. Quick recoveries caused a large spike in market growth, but were stunted just over a year later with the Russian Financial Crisis. Devaluation of the ruble and government debt defaults sent markets crashing in the Eurozone, with Switzerland's SMI falling nearly 10% in just under 2 months. Further questions based upon the data would be focused around individual industry funds within the overall national indices. This could answer questions regarding what drove major growth in Swiss and German markets, while progress stagnated for their British and French counterparts. 
+
+
+## LifeCycleSavings Dataset
+
+#### R-Code
+
+```{r}
+scaled_x <- function(x){
+  return(x/max(x))
+}
+country_names <- row.names(LifeCycleSavings)
+
+LifeCycleSavings <- sapply(LifeCycleSavings, scaled_x)
+
+LifeCycleSavings <- as.data.frame(LifeCycleSavings)
+
+LifeCycleSavings_tibble <- as.tibble(cbind(LifeCycleSavings, country_names))
+
+LifeCycleSavings_tibble <- melt(LifeCycleSavings_tibble)
+```
+
+#### Figure
+
+```{r, fig.width=7, fig.height=7}
+ggplot(LifeCycleSavings_tibble, aes(x = variable, y = country_names)) +
+  scale_fill_gradient(name = "Proportion", low="white", high="steelblue") +
+  geom_tile(aes(fill=value)) +
+  ylim(rev(levels(LifeCycleSavings_tibble$country_names))) +
+  ylab("Country") +
+  xlab("Variable") +
+  labs(title = "Lifecycle of Savings", subtitle="Assorted Variables by Country")
+```
+
+
+#### Summary
+
+> This tile chart follows the `LifeCycleSavings` dataset found in R, which is derived from an unpublished MIT BS thesis. The data contains observations for 50 countries on 5 variables which, according to the hypothesis developed by Franco Modigliani, should affect the savings ratio; the savings ratio itself, the proportion of the population under 15, the proportion of the population over 75, the disposable income in real dollars, and the numeric growth rate of disposable income. While model-building techniques could be implemented to see the relationship between these variables, the tile plot above is a useful exploratory tool to visualize the correlation between variables. Note that each tile is colored based upon the ratio of the variable's value to the maximum value in that column. For example, the United States as the highest disposable income, so its 'dpi' proportion is 1, the highest value in the dpi column. Likewise, Japan takes the gold for the highest savings rate, the Phillipines is the youngest country, while France; Belgium; and Austria are the oldest, and Libya has the largest growth in disposable income. To tease out linear relationship, we would look for consistent high-low relationships between `sr` and one of the variables. Note that dpi seems to correlate highly with sr, but perhaps in a counterintuitive way; nations will low disposable income seem to fall closer to the high values of savings-rate. A logical explanation may focus on income-insecurity: if the populace feels they may lose their income source, they may have a higher marginal propensity to save for future unemployment. Additionally, note that high proportions of populations above 75 trend well with low-savings rate. This concept is less hidden; elderly citizens are often not working and are living off of prior savings rather than saving currently. Since the proportions of the population above 75 and those under 15 seem to be inversely related, the relationship between the population under 15 and savings rate is also strong. Finally, the ddpi variable is mostly low, with a single stand-out in Libya, making differences hard to discern. Overall, the chart displays an interesting visual, but yields more questions than answers. In what ways are disposable income and population demographics related? What percentage of the variance in savings rate is determined by these factors? Is the relationship between disposable income and savings rate a causal one? All of these questions could be addressed through more advanced statistical methods.
